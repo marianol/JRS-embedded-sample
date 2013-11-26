@@ -1,0 +1,4 @@
+name = JasperServer SSO
+description = An example showing how to create a simple API based SSO with Jasper Report Server v 5.x.
+core = 7.x
+dependencies[] = trigger

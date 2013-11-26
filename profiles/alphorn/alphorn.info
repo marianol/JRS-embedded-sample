@@ -1,0 +1,9 @@
+name = ST Alphorn
+description = ST Alphorn install fullsize package.
+version = VERSION
+core = 7.x
+dependencies[] = block
+dependencies[] = dblog
+files[] = alphorn.profile
+
+

@@ -1,0 +1,437 @@
+<?php
+
+/**
+ * @file
+ * Jasper Report Server simple REST API based SSO for Drupal
+ */
+
+module_load_include('inc', 'jasperserver_sso', 'jasper.rest');
+
+define('JRS_SESSION_TIMEOUT',  60 ); // 1 minute
+
+/**
+ * @defgroup jasperserver_sso Example: Trigger
+ * @ingroup jasperserver
+ * @{
+ *
+ * Jasper Report Server simple REST API based SSO for Drupal
+ *
+ * This module uses the Jasper Report Server REST API to integrate Drupal with
+ * Jasper reports Server.
+ *
+ * - The SSO method uses Jasper Server REST API and cookies for the allowing
+ * the user to login (initiate a session) in Jasper when he logs into Drupal
+ * for this to work JRS and the Drupal have to run in the same domain.
+ *
+ * - The Jasper Server Session is kept alive on each page refresh and then is
+ * destryed when the user log out of Drupal 
+ *
+ * See:
+ *
+ * @link http://community.jaspersoft.com/documentation/ Jasper Reports Server Documentation @endlink
+ *
+ * @link http://www.jaspersoft.com/ Japspersoft Main Site @endlink
+ *
+ */
+
+/**
+ * Implements hook_trigger_info().
+ *
+ * We call hook_trigger_info when we are defining the triggers we provide.
+ * Triggers are the events that make fire any number of assigned actions. In
+ * this example, we are registering our three new triggers, providing the group
+ * (system, user..), the callback 'hook' (only informative, does not require a
+ * real hook) function and the label to be shown in the triggers interface.
+ *
+ * Example: In the group (a tab) 'system', for the 'mail' functionality, show:
+ * An email is sent by Drupal.
+ */
+function jasperserver_sso_trigger_info() {
+  return array(
+    'jasperserver_sso' => array(
+      'triggersomething' => array(
+        'label' => t('After the triggersomething button is clicked'),
+      ),
+    ),
+  );
+}
+
+
+/**
+ * triggersomething trigger: Run actions associated with an arbitrary event.
+ *
+ * Here pressing a button is a trigger. We have defined a
+ * custom function as a trigger (jasperserver_sso_triggersomething).
+ * It will ask for all actions attached to the 'triggersomething' event,
+ * prepare a basic 'context' for them
+ * and run all of them. This could have been implemented by a hook
+ * implementation, but in this demonstration, it will just be called in a
+ * form's submit.
+ *
+ * This function is executed during the submission of the example form defined
+ * in this module.
+ *
+ * @param $options
+ *   Array of arguments used to call the triggersomething function, if any.
+ */
+function jasperserver_sso_triggersomething($options = array()) {
+  // Ask the trigger module for all actions enqueued for the 'triggersomething' trigger.
+  $aids = trigger_get_assigned_actions('triggersomething');
+  // prepare a basic context, indicating group and "hook", and call all the
+  // actions with this context as arguments.
+  $context = array(
+    'group' => 'jasperserver_sso',
+    'hook' => 'triggersomething'
+  );
+  actions_do(array_keys($aids), (object) $options, $context);
+}
+
+
+/**
+ * Implements hook_user_login().
+ *
+ * User login trigger for SSO with JasperReports Server
+ *
+ * This SSO method uses Jasper Server REST API and cookies for the SSO
+ * for this to work JRS and the Drupal have to run in the same domain.
+ * 
+ */
+function jasperserver_sso_user_login(&$edit, $account, $category = NULL) {
+
+  // Get the username and password to pass to the JRS REST Call
+  $jasperOrg = "organization_1";
+  $japserUser  = $edit['values']['name']  . '|' . $jasperOrg;
+  $jasperPassword = $edit['values']['pass'];
+  
+  $requestBody = array(
+      'j_username' => $japserUser,
+      'j_password' => $jasperPassword
+  );
+  
+  $response = jasperserver_sso_rest_post('login', $requestBody);
+
+  switch ($response['metadata']['http_code']) {
+      case 200:
+          /*  All OK Japser login succeded
+           * Extract the Cookie and save the string in my session for further requests.
+           * Cookie format: JSESSIONID=<sessionID>; $Path=<pathToJRS>
+          */
+          preg_match('/^Set-Cookie: (.*?)$/sm', $response['body'], $cookie);
+          $_SESSION['JRS_Cookie'] = '$Version=0; ' . str_replace('Path', '$Path', $cookie[1]);
+          // Grab the JS Session ID and set the cookie in the right path so 
+          // when I present an iFrame I can use that session to be authenticated
+          // For this to work JS and the App have to run in the same domain 
+          
+          preg_match_all('/=(.*?);/' , $cookie[1], $cookievalue);
+          $JRSSessionID = $cookievalue[1][0];
+          $JRSPath = $cookievalue[1][1];
+          $_SESSION['JRS_SessionID'] = $JRSSessionID;
+          $_SESSION['JRS_Path'] = $JRSPath;
+          setcookie('JSESSIONID', $JRSSessionID , time() + JRS_SESSION_TIMEOUT * variable_get('jasperserver_sso_sessiontimeout', 20), $JRSPath);
+          break;
+      case 401:
+          // 401 Unauthorized What should we do???
+          drupal_set_message(t('An error occurred: Jasper Server Login Failed for user: @user - Contact your administrator.', array('@user' => $japserUser)), 'warning');
+          break;
+      case 302:
+          // 302 – License expired or otherwise not valid.
+          drupal_set_message(t('An error occurred: Jasper Server License expired or otherwise not valid.'), 'error');
+          break;          
+      default:
+          // Unrecognized error, login should respond with 200, 302 or 401 only
+          drupal_set_message(t('An error occurred: Unrecognized error Jasper SSO Error.'), 'error');
+          break;
+  }
+  // dd($response['metadata'] , 'login');
+  
+  if ($account->access == 0) {
+    // Frist time logging in
+  }
+}
+
+/**
+ * Implements hook_user_logout
+ *
+ * Expire the Japser Server SSO Cookie on user logout.
+ */
+function jasperserver_sso_user_logout($account){
+  // Expire Jasper Session Cookie
+  setcookie('JSESSIONID', '' , time() - 3600, $_SESSION['JRS_Path']);
+  unset($GLOBALS[_SESSION]['JRS_SessionID']);
+  
+}
+
+/**
+ * Implementation of hook_init().
+ * 
+ * Keep the Jasper Server Session alive as long as the user is logged into Drupal
+ * 
+ */
+function jasperserver_sso_init() {
+    if(isset($_SESSION['JRS_SessionID'])) {
+        // do a bogus rest call and update the cookie to keep the JRS session alive
+        $result = jasperserver_sso_rest_keepalive();
+        setcookie('JSESSIONID', $_SESSION['JRS_SessionID'] , time() + JRS_SESSION_TIMEOUT * variable_get('jasperserver_sso_sessiontimeout', 20), $_SESSION['JRS_Path']);
+        // dd($result , 'watchdog');
+    }
+    
+}
+
+/**
+ * Helper functions for the module interface to test the triggersomething trigger.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function jasperserver_sso_help($path, $arg) {
+  switch ($path) {
+    case 'examples/jasperserver_sso':
+      $explanation = t(
+        'Click the button on this page to call jasperserver_sso_triggersomething()
+        and fire the triggersomething event. First, you need to create an action
+        and assign it to the "After the triggersomething button is clicked" trigger,
+        or nothing will happen.  Use the <a href="@actions-url">Actions settings page</a>
+        and assign these actions to the triggersomething event on the
+        <a href="@triggers-url">Triggers settings page</a>. <br/><br/>
+        ', array('@actions-url' => url('admin/config/system/actions'), '@triggers-url' => url('admin/structure/trigger/jasperserver_sso')));
+      return "<p>$explanation</p>";
+    case 'admin/settings/jasperserver_sso-config':
+      return t('The JasperReports Server SSO module allows you to integrate JRS with Drupal.<br/>
+      JapserReports Server and Drupal must be running in the same domain for this module to work.<br/><br/>
+      Use the form below to configure the settings of your JasperServer instance. ');
+    case 'admin/structure/trigger/jasperserver_sso':
+      $explanation = t(
+      "A trigger is a system event. For the trigger example, it's just a button-press.
+      To demonstrate the trigger example, choose to associate the 'display a message to the user'
+      action with the 'after the triggersomething button is pressed' trigger.");
+      return "<p>$explanation</p>";
+  }
+}
+
+/**
+ * Implements hook_menu().
+ *
+ * Provides a form that can be used to fire the module's triggers.
+ */
+function jasperserver_sso_menu() {
+  $items['admin/settings/jasperserver_sso-config'] = array(
+    'title'           => 'Jasper Report Server SSO',
+    'description'     => 'Jasper Report Server SSO settings page.',
+    'page callback'   => 'drupal_get_form',
+    'page arguments' => array('jasperserver_sso_admin'),
+    'access arguments' => array('administer jasperserver_sso settings'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_block_info().
+ *
+ * This hook declares what blocks are provided by the module.
+ */
+function jasperserver_sso_block_info() {
+  // This hook returns an array, each component of which is an array of block
+  // information. The array keys are the 'delta' values used in other block
+  // hooks.
+
+  // The required block information is a block description, which is shown
+  // to the site administrator in the list of possible blocks. You can also
+  // provide initial settings for block weight, status, etc.
+
+  // Many options are defined in hook_block_info():
+  $blocks['jasperserver_library'] = array(
+    // info: The name of the block.
+    'info' => t('Jasper Server Library View'),
+    // Block caching options (per role, per user, etc.)
+    'cache' => DRUPAL_CACHE_PER_USER, 
+  );
+
+  // This sample shows how to provide default settings. In this case we'll
+  // enable the block in the first sidebar and make it visible only on
+  // 'node/*' pages. See the hook_block_info() documentation for these.
+  $blocks['jasperserver_repository'] = array(
+    'info' => t('Jasper Server Repository View'),
+    'cache' => DRUPAL_CACHE_PER_USER, 
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_configure().
+ *
+ * This hook declares configuration options for blocks provided by this module.
+ */
+function jasperserver_sso_block_configure($delta = '') {
+  // The $delta parameter tells us which block is being configured.
+  // In this example, we'll allow the administrator to customize
+  // the text of the 'configurable text string' block defined in this module.
+
+  $form = array();
+  if ($delta == 'jasperserver_library') {
+    // All we need to provide is the specific configuration options for our
+    // block. Drupal will take care of the standard block configuration options
+    // (block title, page visibility, etc.) and the save button.
+    $form['jasperserver_library_theme'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Jasperserver Theme Name'),
+      '#size' => 20,
+      '#description' => t('The JasperReport Server theme to be used in this block.'),
+      '#default_value' => variable_get('jasperserver_library_theme',  'embed'),
+    );
+  }
+  return $form;
+}
+
+/**
+ * Implements hook_block_save().
+ *
+ * This hook declares how the configured options for a block
+ * provided by this module are saved.
+ */
+function jasperserver_sso_block_save($delta = '', $edit = array()) {
+  // We need to save settings from the configuration form.
+  // We need to check $delta to make sure we are saving the right block.
+  if ($delta == 'jasperserver_library') {
+    // Have Drupal save the config to the database.
+    variable_set('jasperserver_library_theme', $edit['jasperserver_library_theme']);
+  }
+  return;
+}
+
+/**
+ * Implements hook_block_view().
+ *
+ * This hook generates the contents of the blocks themselves.
+ */
+function jasperserver_sso_block_view($delta = '') {
+  //The $delta parameter tells us which block is being requested.
+  $block = array();
+  switch ($delta) {
+    case 'jasperserver_library':
+      // The subject is displayed at the top of the block. Note that it
+      // should be passed through t() for translation. The title configured
+      // for the block using Drupal UI supercedes this one.
+      $block['subject'] = t('BI Library');
+      $block['content'] = jasperserver_sso_blocks_content($delta);
+      break;
+    case 'jasperserver_repository':
+      $block['subject'] = t('Reports Repository');
+      $block['content'] = jasperserver_sso_blocks_content($delta);
+      break;
+  }
+  return $block;
+}
+
+/**
+ * A module-defined block content function.
+ */
+function jasperserver_sso_blocks_content($which_block) {
+  $JRS_URL = $GLOBALS['base_root'] . ':' .  variable_get('jasperserver_sso_port', 8080) 
+        . '/' . variable_get('jasperserver_sso_context', 'jasperserver-pro') . '/flow.html?' ;
+  $JRS_Parameters = array();
+  
+  $JRS_Parameters['theme'] = variable_get('jasperserver_library_theme',  'embed');
+  
+  switch ($which_block) {
+    case 'jasperserver_library':
+      // Generate the iFrame code required
+      // array('#markup' => variable_get('block_example_string',  t('A default value. This block was created at %time', array('%time' => date('c')))));
+      $JRS_Parameters['_flowId'] = 'searchFlow';
+      $JRS_Parameters['mode'] = 'library';
+      break;
+      
+  }
+  foreach ($JRS_Parameters as $key => $value) {
+      $JRS_URL .= $key . '=' . urldecode($value) . '&';
+  }
+  $output = '<iframe src="' . $JRS_URL . '" width="100%" height="100%" frameborder="0"></iframe>';
+  return $output;
+}
+
+/**
+ * Module Stettings Form for the jasperserver_sso
+ */
+function jasperserver_sso_admin() {
+  $form = array();
+
+  $form['jasperserver_sso_context'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Jasper Report Server Context'),
+    '#default_value' => variable_get('jasperserver_sso_context', 'jasperserver-pro'),
+    '#size' => 30,
+    '#maxlength' => 150,
+    '#description' => t("The context (URL path) on which Jasper Report Server is installed without the host name.<br> 
+    Since the host has to be the same as the drupal host for this module to work. <br> i.e.: If JRS is installed 
+    in http://www.mydrupal.com:8080/jasperserver your context is 'jasperserver' and your port 8080."),
+    '#required' => TRUE,
+  );
+  $form['jasperserver_sso_port'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Jasper Report Server Port'),
+    '#default_value' => variable_get('jasperserver_sso_port', 8080),
+    '#size' => 2,
+    '#maxlength' => 5,
+    '#description' => t("The port on which Jasper Report Server is installed (tomcat default 8080 using mod_jk 80)."),
+    '#required' => TRUE,
+  );
+  $form['jasperserver_sso_sessiontimeout'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Jasper Report Server Session Time out'),
+    '#default_value' => variable_get('jasperserver_sso_sessiontimeout', 20),
+    '#size' => 2,
+    '#maxlength' => 2,
+    '#description' => t("The Jasper Report Server session length (in minutes) as defined in your application server container."),
+    '#required' => TRUE,
+  );
+  return system_settings_form($form);
+}
+
+/**
+ * Settingd Form Validation handler for jasperserver_sso_admin() 
+ */
+function jasperserver_sso_admin_validate($form, &$form_state) {
+
+  if (!is_numeric($form_state['values']['jasperserver_sso_port'])) {
+    form_set_error('jasperserver_sso_port', t('You must enter an integer for Jasper Server port number.'));
+  }
+  elseif ($form_state['values']['jasperserver_sso_port'] <= 0) {
+    form_set_error('jasperserver_sso_port', t('Jasper Server port number must be positive.'));
+  }
+  if (!is_numeric($form_state['values']['jasperserver_sso_sessiontimeout'])) {
+    form_set_error('jasperserver_sso_port', t('You must enter an integer number of minutes for Jasper Server session length.'));
+  }
+  elseif ($form_state['values']['jasperserver_sso_sessiontimeout'] <= 0) {
+    form_set_error('jasperserver_sso_port', t('Jasper Server session length must be positive.'));
+  }
+}
+
+/**
+ * Optional usage of hook_trigger_info_alter().
+ *
+ * This function is not required to write your own triggers, but it may be
+ * useful when you want to alter existing triggers.
+ */
+
+/**
+ * Implements hook_trigger_info_alter().
+ *
+ * We call hook_trigger_info_alter when we want to change an existing trigger.
+ * As mentioned earlier, this hook is not required to create your own triggers,
+ * and should only be used when you need to alter current existing triggers. In
+ * this example implementation a little change is done to the existing trigger
+ * provided by core: 'cron'
+ *
+ * @param $triggers
+ *   Array of trigger information returned by hook_trigger_info()
+ *   implementations.
+ *
+ * @see hook_trigger_info()
+ */
+function jasperserver_sso_trigger_info_alter(&$triggers) {
+  // Make a simple change to an existing core trigger, altering the label
+  // "When cron runs" to our custom label "On cron execution"
+  $triggers['system']['cron']['label'] = t('On cron execution');
+}
