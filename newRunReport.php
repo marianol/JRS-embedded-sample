@@ -1,20 +1,34 @@
 <?php
 
-//require_once __DIR__ . "/jasperclient_new/autoload.dist.php";
-require_once "jasperclient_new/src/Jaspersoft/Client/Client.php";
-require_once "jasperclient_new/src/Jaspersoft/Tool/RESTRequest.php";
-require_once "jasperclient_new/src/Jaspersoft/Service/ReportService.php";
-require_once "jasperclient_new/src/Jaspersoft/Service/OptionsService.php";
-require_once "jasperclient_new/src/Jaspersoft/Dto/Options/ReportOptions.php";
-require_once "jasperclient_new/src/Jaspersoft/Service/RepositoryService.php";
-require_once "jasperclient_new/src/Jaspersoft/Service/Criteria/Criterion.php";
-require_once "jasperclient_new/src/Jaspersoft/Tool/Util.php";
-require_once "jasperclient_new/src/Jaspersoft/Service/Criteria/RepositorySearchCriteria.php";
-require_once "jasperclient_new/src/Jaspersoft/Exception/RESTRequestException.php";
-require_once "jasperclient_new/src/Jaspersoft/Dto/Report/InputControl.php";
+//require_once "/jrs-rest-php-client/vendor/autoload.php"
+
+require_once __DIR__ . "/jrs-rest-php-client/autoload.dist.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Client/Client.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Tool/RESTRequest.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/ReportService.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/OptionsService.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Dto/Options/ReportOptions.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/RepositoryService.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/Criteria/Criterion.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Tool/Util.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/Criteria/RepositorySearchCriteria.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Exception/RESTRequestException.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Dto/Report/InputControl.php";
+
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/Result/SearchResourcesResult.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Dto/Resource/ResourceLookup.php";
 
 use Jaspersoft\Client\Client;
+use Jaspersoft\Service\RepositoryService;
+use Jaspersoft\Service\Result\SearchResourcesResult;
 use Jaspersoft\Service\Criteria\RepositorySearchCriteria;
+
+use Jaspersoft\Dto\Resource\ResourceLookup;
+use Jaspersoft\Dto\Resource\Resource;
+use Jaspersoft\Dto\Resource\File;
+use Jaspersoft\Tool\RESTRequest;
+use Jaspersoft\Tool\Util;
+use Jaspersoft\Tool\MimeMapper;
 
 class WPReport {
      
@@ -84,36 +98,10 @@ class WPReport {
         echo json_encode($result);
     }
 
-     /* ALERT- THIS FUNCTION DOES NOT WORK YET DUE, REPOSITORY SERVICES WILL ONLY BE IMPLEMENTED
-     *         IN 5.5 RELEASE, CURRENTLY 2 VERSIONS AWAY. 
-     *
-     * This function returns the repository available from the position 'uri'
-     * the data is echoed in JSON format so it can be used by a jQuery function
-     * to populate a dropdown select HTML element
-     * example: thisfile.php?func=getRepo&uri=/public
-     * This returns all of the reports in JSON format from the "public" folder down
-     */
-    public function getRepo() {
-        if(isset($_GET['uri'])){
-            $result = array();
-            $searchCriteria = new RepositorySearchCriteria();
-            $searchCriteria->folderUri = $_GET['uri'];
-
-            echo json_encode($searchCriteria->toArray());
-
-            // next line recursively gets every reportUnit from the repository
-            $repo = $this->client->repositoryService()->resourceSearch($searchCriteria);
-        }
+    public function getRepository() {
+        $repo = $this->client->repositoryService()->searchResources();
+        echo json_encode($repo);
     }
-
-    // ALERT - THIS FUNCTION DOES NOT WORK, PROBABLY DUE TO THE SAME REASON AS ABOVE
-    // obtains the report options in json format for the respective report
-    public function getReportOptions() {
-        if(isset($_GET['uri'])){
-           $options = $this->client->optionsService()->getReportOptions($_GET['uri']);
-           echo json_encode($options);
-        }
-    } 
 
     // obtains the input controls in json format for the respective report
     public function getInputControls() {
