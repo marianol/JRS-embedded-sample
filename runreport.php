@@ -1,6 +1,35 @@
 <?php
-require_once('jasperclient/client/JasperClient.php');
- 
+
+//require_once "/jrs-rest-php-client/vendor/autoload.php"
+
+require_once __DIR__ . "/jrs-rest-php-client/autoload.dist.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Client/Client.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Tool/RESTRequest.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/ReportService.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/OptionsService.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Dto/Options/ReportOptions.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/RepositoryService.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/Criteria/Criterion.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Tool/Util.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/Criteria/RepositorySearchCriteria.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Exception/RESTRequestException.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Dto/Report/InputControl.php";
+
+require_once "jrs-rest-php-client/src/Jaspersoft/Service/Result/SearchResourcesResult.php";
+require_once "jrs-rest-php-client/src/Jaspersoft/Dto/Resource/ResourceLookup.php";
+
+use Jaspersoft\Client\Client;
+use Jaspersoft\Service\RepositoryService;
+use Jaspersoft\Service\Result\SearchResourcesResult;
+use Jaspersoft\Service\Criteria\RepositorySearchCriteria;
+
+use Jaspersoft\Dto\Resource\ResourceLookup;
+use Jaspersoft\Dto\Resource\Resource;
+use Jaspersoft\Dto\Resource\File;
+use Jaspersoft\Tool\RESTRequest;
+use Jaspersoft\Tool\Util;
+use Jaspersoft\Tool\MimeMapper;
+
 class WPReport {
      
     public $client;
@@ -17,7 +46,7 @@ class WPReport {
             );
  
     public function __construct() {
-        $this->client = new Jasper\JasperClient('localhost', 8080, 'demo', 'JasperDemo', '/jasperserver-pro', 'organization_1');
+        $this->client = new Client('localhost', 8080, 'jasperadmin', 'jasperadmin', '/jasperserver-pro', 'organization_1');
     }
      
   
@@ -28,24 +57,7 @@ class WPReport {
      */
     public function run() {
         if(isset($_GET['uri']) && isset($_GET['format'])) {
-            $report_data = $this->client->runReport($_GET['uri'], $_GET['format']);
-            if ($_GET['format'] !== 'html') {
-            echo $this->prepareForDownload($report_data, $_GET['format']);
-            }
-            else {
-                echo $report_data;
-            }
-        }
-    }
-
-     /** NOT GOING TO USE THIS FUNCTION AS PASSING THE INPUT CONTROLS IS MORE AWKWARD THEN MAKING A RAW REST CALL IN JQUERY
-     * runWithIC() is to be called via a GET parameter. Using runWithIC() will run a report specified by URI, FORMAT and Input Controls get calls.
-     * Example: thisfile.php?func=runWithIC&uri=/reports/samples/AllAccounts&format=pdf&inputControls=~JSON Data~
-     * Calling the file in this manner will return the binary of the specified report, in PDF format
-     */
-    public function runWithIC() {
-        if(isset($_GET['uri']) && isset($_GET['format'])) {
-            $report_data = $this->client->runReport($_GET['uri'], $_GET['format'], null, null, ($_GET['inputControls']));
+            $report_data = $this->client->reportService()->runReport($_GET['uri'], $_GET['format']);
             if ($_GET['format'] !== 'html') {
                 echo $this->prepareForDownload($report_data, $_GET['format']);
             }
@@ -54,7 +66,6 @@ class WPReport {
             }
         }
     }
-
      
     /**
      * This function prepares a page with the proper headers to initiate a download dialog in modern browsers
@@ -74,23 +85,7 @@ class WPReport {
             }
             echo $data;
     }
-    /**
-     * This function returns the reports vailable at the position 'uri'
-     * the data is echoed in JSON format so it can be used by a jQuery function
-     * to populate a dropdown select HTML element
-     * example: thisfile.php?func=getReports&uri=/reports/samples
-     */
-    public function getReports() {
-   	if(isset($_GET['uri'])) {
-            $result = array();
-            $repo = $this->client->getRepository($_GET['uri']);
-            foreach($repo as $r) {
-                $result[] = array('name' => $r->getLabel(), 'uri' => $r->getUriString());
-            }
-            sort($result);
-            echo json_encode($result);
-        }
-    }
+
     /**
      * This function simply json-ifys the array above to populate a drop-down menu
      * select HTML element. This way it is easy to change the formats available
@@ -103,55 +98,34 @@ class WPReport {
         echo json_encode($result);
     }
 
-     /**
-     * This function returns the repository available from the position 'uri'
-     * the data is echoed in JSON format so it can be used by a jQuery function
-     * to populate a dropdown select HTML element
-     * example: thisfile.php?func=getRepo&uri=/public
-     * This returns all of the reports in JSON format from the "public" folder down
-     */
-    public function getRepo() {
-   	if(isset($_GET['uri'])) {
-            $result = array();
-            // next line recursively gets every reportUnit from the repository
-            $repo = $this->client->getRepository($_GET['uri'], null, 'reportUnit', '1');
-            foreach($repo as $r) {
-                $result[] = array('name' => $r->getLabel(), 'uri' => $r->getUriString(), 'type' => $r->getWsType());
-            }
-            sort($result);
-            echo json_encode($result);
+    public function getRepository() {
+        $criteria = new RepositorySearchCriteria();
+
+        if(isset($_GET['uri'])) {
+            $criteria->folderUri = $_GET['uri'];
+        }else {
+            $criteria->folderUri = '/public/Samples/Reports';
         }
+
+        $criteria->type = 'reportUnit';
+        $criteria->recursive = true;
+
+        $repo = $this->client->repositoryService()->searchResources($criteria);
+
+        foreach($repo->items as $r) {
+            $result[] = array('label' => $r->label, 'uri' => $r->uri, 'resourceType' => $r->resourceType);
+        }
+
+        echo json_encode($result);
     }
 
-
-    //
-    public function getResourceInfo() {
+    // obtains the input controls in json format for the respective report
+    public function getInputControls() {
         if(isset($_GET['uri'])){
-            echo $this->client->getResource($_GET['uri']);
+            $ic = $this->client->reportService()->getReportInputControls($_GET['uri']);
+            echo json_encode($ic);
         }
     }
-
-
-    /** This function retrieves the descriptor for the resource at $path in form $file.
-	 *  for other paramaters.. see web services documentation
-	 *
-	 * @param string $path
-	 * @param string $file
-	 * @param string $ic_get_query_data
-	 * @param string $p_param
-	 * @param string $pl_param
-	 * @return \Jasper\ResourceDescriptor
-	 */
-	//public function getResource($path, $file = null, $ic_get_query_data = null, $p_param = null, $pl_param = null) {
-	//	$url = $this->restUrl . '/resource' . $path;
-	//	$suffix = http_build_query(array('file' => $file, 'IC_GET_QUERY_DATA' => $ic_get_query_data));
-	//	if (!empty($suffix)) { $url .= '?' . $suffix; }
-	//	$data = $this->prepAndSend($url, 200, 'GET', null, true);
-//
-//		return ResourceDescriptor::createFromXML($data);
-//	}
-
-
 
 } // WPReport
  

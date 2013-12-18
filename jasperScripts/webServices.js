@@ -7,9 +7,9 @@
 jQuery(document).ready(function ($) { 
       
         var DIRECTORY_TO_SEARCH_FROM = "/public"; // this is the directory that the repository search will start and recurse downwards from
- 
+
         // gets all the reports from the public folder down in the repository and creates a nested list to create a file directory browser
-	$.getJSON("./runreport.php?func=getRepo&uri="+DIRECTORY_TO_SEARCH_FROM,
+	$.getJSON("./runreport.php?func=getRepository&uri="+DIRECTORY_TO_SEARCH_FROM,
 		function(data){
 		    $.each(data, function(){
 			var uriSplit = this.uri.split("/");
@@ -25,7 +25,7 @@ jQuery(document).ready(function ($) {
                             
                             if($("#"+idJoin).length == 0){
                                 if(i == uriSplit.length-1){
-                                    $("#"+prevIdJoin).append("<li class=\"repoListItems\" id=\""+idJoin+"\" style=\"display: none;\"><a href=\""+this.uri+"\" onclick=\"loadHref(this.href);return false;\">"+this.name+"</a></li>").hide();
+                                    $("#"+prevIdJoin).append("<li class=\"repoListItems\" id=\""+idJoin+"\" style=\"display: none;\"><a href=\""+this.uri+"\" onclick=\"loadHref(this.href);return false;\">"+this.label+"</a></li>").hide();
                                 }else{
 			            $("#"+prevIdJoin).append("<ul class=\"repoFolderItems\" id=\""+idJoin+"\">"+uriSplit[i]+"</ul>");
                                 }
