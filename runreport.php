@@ -57,7 +57,19 @@ class WPReport {
      */
     public function run() {
         if(isset($_GET['uri']) && isset($_GET['format'])) {
-            $report_data = $this->client->reportService()->runReport($_GET['uri'], $_GET['format']);
+            $report_data = $this->client->reportService()->runReport($_GET['uri'], $_GET['format'],null,null,null,true);
+            if ($_GET['format'] !== 'html') {
+                echo $this->prepareForDownload($report_data, $_GET['format']);
+            }
+            else {
+                echo $report_data;
+            }
+        }
+    }
+    public function runWithIC() {
+        if(isset($_GET['uri']) && isset($_GET['format'])) {
+            $controls = array('Product_Family' => array('Non-Consumable'));
+            $report_data = $this->client->reportService()->runReport($_GET['uri'], $_GET['format'], null, null, $controls);
             if ($_GET['format'] !== 'html') {
                 echo $this->prepareForDownload($report_data, $_GET['format']);
             }

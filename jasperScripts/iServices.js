@@ -24,9 +24,9 @@ jQuery(document).ready(function ($) {
                             if($("#"+idJoin).length == 0){
                                 if(i == uriSplit.length-1){
                                     $("#"+prevIdJoin).append("<li class=\"repoListItems\" id=\""+idJoin+"\" style=\"display: none;\"><a "+targetString+
-                                                             " "+baseURL+this.uri+"\" >"+this.label+"</a></li>").hide();
+                                                             " "+baseURL+this.uri+"\" >"+this.label+"</a></li>");
                                 }else{
-			            $("#"+prevIdJoin).append("<ul class=\"repoFolderItems\" id=\""+idJoin+"\">"+uriSplit[i]+"</ul>");                                    
+                                    $("#"+prevIdJoin).append("<ul class=\"repoFolderItems\" id=\""+idJoin+"\">"+uriSplit[i]+"</ul>");                                    
                                 }
                             }
                             
