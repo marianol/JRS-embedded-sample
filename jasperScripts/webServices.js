@@ -6,42 +6,44 @@
 
 jQuery(document).ready(function ($) { 
       
-        var DIRECTORY_TO_SEARCH_FROM = "/public"; // this is the directory that the repository search will start and recurse downwards from
+    var DIRECTORY_TO_SEARCH_FROM = "/public"; // this is the directory that the repository search will start and recurse downwards from
 
         // gets all the reports from the public folder down in the repository and creates a nested list to create a file directory browser
 	$.getJSON("./runreport.php?func=getRepository&uri="+DIRECTORY_TO_SEARCH_FROM,
 		function(data){
 		    $.each(data, function(){
-			var uriSplit = this.uri.split("/");
-                        var idJoin = "";
-                        var prevIdJoin = "";
+                var uriSplit = this.uri.split("/");
+                var idJoin = "";
+                var prevIdJoin = "";
 
-                        var targetString = "target=\"report_viewer\"";
-                        var loginCredentials = "j_username=demo&j_password=JasperDemo";
-                        //var baseURL = "href=\"/jasperserver-pro/flow.html?_flowId=viewReportFlow&standAlone=true&decorate=no&"+loginCredentials+"&_flowId=viewReportFlow&reportUnit="
-                        
-                        for(var i = 1; i < uriSplit.length; i++){
-                            idJoin += uriSplit[i]; 
-                            
-                            if($("#"+idJoin).length == 0){
-                                if(i == uriSplit.length-1){
-                                    $("#"+prevIdJoin).append("<li class=\"repoListItems\" id=\""+idJoin+"\" style=\"display: none;\"><a href=\""+this.uri+"\" onclick=\"loadHref(this.href);return false;\">"+this.label+"</a></li>").hide();
-                                }else{
-			            $("#"+prevIdJoin).append("<ul class=\"repoFolderItems\" id=\""+idJoin+"\">"+uriSplit[i]+"</ul>");
-                                }
-                            }
-                            
-                            prevIdJoin = idJoin;
+                var targetString = "target=\"report_viewer\"";
+                var loginCredentials = "j_username=demo&j_password=JasperDemo";
+                //var baseURL = "href=\"/jasperserver-pro/flow.html?_flowId=viewReportFlow&standAlone=true&decorate=no&"+loginCredentials+"&_flowId=viewReportFlow&reportUnit="
+                
+                for(var i = 1; i < uriSplit.length; i++){
+                    idJoin += uriSplit[i]; 
+                    
+                    if($("#"+idJoin).length == 0){
+                        if(i == uriSplit.length-1){
+                            $("#"+prevIdJoin).append("<li class=\"repoListItems\" id=\""+idJoin+"\"><a href=\""+this.uri+"\" onclick=\"loadHref(this.href);return false;\">"+this.label+"</a></li>");
+                        }else{
+                            $("#"+prevIdJoin).append("<ul class=\"repoFolderItems\" id=\""+idJoin+"\" style=\"display: none;\">"+uriSplit[i]+"</ul>");
                         }
-                    });
-                }           
-        );
+                    }
+                    
+                    prevIdJoin = idJoin;
+                }
+            });
+            $("#public").click();  
+        }           
+    );
 
         // binds a click event to the folder items to animate opening and closing of the folders
         $(".repoFolderItems").bind("click", function(event){
             // stops a list item from being hidden by mistake
             if($(event.target).hasClass("repoFolderItems")){
-                $("#"+event.target.id).children().slideToggle("slow");
+                $("#"+event.target.id).children(".repoFolderItems").slideToggle("slow");
+                $("#"+event.target.id).children(".repoFolderItems").children().slideToggle("slow");
                 $("#"+event.target.id).toggleClass("open");
             }
         });
@@ -107,20 +109,19 @@ jQuery(document).ready(function ($) {
        
         // run the report with Input Controls
         jQuery("#displayReport").load("../../jasperserver-pro/rest_v2/reports"+clickedURL+".html?"+ICInfo, function(){
-	    updatePageInfo();
-	    changePage();
-            refreshPage();
+	       updatePageInfo();
+	       changePage();
+           refreshPage();
         });
     });
 
     // refresh the report by re-running the currently selected report
     $('#refresh_report').on('click', function(event) {
         jQuery("#displayReport").load("runreport.php?func=run&uri="+clickedURL+"&format=html", function(){
-	    updatePageInfo();
-	    changePage();
-            updateInputControls(clickedURL);
-       
-            refreshPage(); 
+	       updatePageInfo();
+	       changePage();
+           updateInputControls(clickedURL);
+           refreshPage(); 
         });
     });
 
@@ -281,10 +282,9 @@ function loadHref(href){
     var index = href.indexOf("/public");
     clickedURL = href.substring(index);
     jQuery("#displayReport").load("runreport.php?func=run&uri="+clickedURL+"&format=html", function(){
-	updatePageInfo();
-	changePage();
+	   updatePageInfo();
+	   changePage();
         updateInputControls(clickedURL);
-       
         refreshPage(); 
     });
 }
