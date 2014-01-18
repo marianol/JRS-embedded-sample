@@ -15,17 +15,13 @@ jQuery(document).ready(function ($) {
                 var uriSplit = this.uri.split("/");
                 var idJoin = "";
                 var prevIdJoin = "";
-
-                var targetString = "target=\"report_viewer\"";
-                var loginCredentials = "j_username=demo&j_password=JasperDemo";
-                //var baseURL = "href=\"/jasperserver-pro/flow.html?_flowId=viewReportFlow&standAlone=true&decorate=no&"+loginCredentials+"&_flowId=viewReportFlow&reportUnit="
-                
+      
                 for(var i = 1; i < uriSplit.length; i++){
                     idJoin += uriSplit[i]; 
                     
                     if($("#"+idJoin).length == 0){
                         if(i == uriSplit.length-1){
-                            $("#"+prevIdJoin).append("<li class=\"repoListItems\" id=\""+idJoin+"\"><a href=\""+this.uri+"\" onclick=\"loadHref(this.href);return false;\">"+this.label+"</a></li>");
+                            $("#"+prevIdJoin).append("<li class=\"repoListItems\" id=\""+idJoin+"\" style=\"display: none;\"><a href=\""+this.uri+"\" onclick=\"loadHref(this.href);return false;\">"+this.label+"</a></li>");
                         }else{
                             $("#"+prevIdJoin).append("<ul class=\"repoFolderItems\" id=\""+idJoin+"\" style=\"display: none;\">"+uriSplit[i]+"</ul>");
                         }
@@ -42,8 +38,7 @@ jQuery(document).ready(function ($) {
         $(".repoFolderItems").bind("click", function(event){
             // stops a list item from being hidden by mistake
             if($(event.target).hasClass("repoFolderItems")){
-                $("#"+event.target.id).children(".repoFolderItems").slideToggle("slow");
-                $("#"+event.target.id).children(".repoFolderItems").children().slideToggle("slow");
+                $("#"+event.target.id).children().slideToggle("slow");
                 $("#"+event.target.id).toggleClass("open");
             }
         });
