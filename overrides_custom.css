@@ -1,0 +1,35 @@
+/* embedded theme                                                            */
+/* Useful for displaying JRS in an iframe in an external application         */
+/* Matthew Dahlman, 18 Dec 2012, tested with JRS 5.0.0 in Chrome and Firefox */
+
+body { min-width : 960px; } /* The JRS default min-width of 1020 is way too big for many embedded scenarios. */
+#frame .column .decorated { margin: 0; }
+#banner.banner { display : none; }
+#frame { top : 0; bottom : 0; }
+#display { background-color: white; }
+#frameFooter { display : none; }
+#results { border: none; }
+
+.column.decorated { border: none; }
+
+#resultsListHeader, #results .header, #reportViewer .header, .column.decorated > .content > .header, .pane .header, .header, .toolbar, #chart-options-container .pod-header, #level-container .pod-header, .pod-body
+  { background-color: white; background-image: none; } /* This removes the default gray background on the Library and other list headers */
+
+#results .header .title { display: none; }
+#display #results .list.resources .createdDate, .list.resources .modifiedDate { width: 45% } /* The default is 43%, but this gets slightly cut off in some browsers. */
+
+#filters #filter-container .list > .leaf, #level-container { border: thin lightgray solid; margin-bottom: 2px; }
+#filters #filter-container ul li.leaf:first-child { border: none; }
+
+/* match colors with SCDP color scheme */
+.list > li > .wrap.pressed, li.selected > div.wrap, .list > li.selected > .wrap.over, #resultsList li.selected > div.wrap > div.resourceType,
+.list > li > .wrap.pressed, .list>li.selected>.wrap, .list>li.selected>.wrap.over, #resultsList li.selected > div.wrap > div.resourceType { background-color: #B81007 !important; color: #fff !important; }
+
+.vtitle, .title { color: #B81007 !important; }
+
+.column .header>.title { color: #B81007 !important; }
+
+.pod-header, .select-header, #filter-container { color: #B81007 !important; }
+
+.list.filters>li.selected>.wrap { color: #fff !important; }
+
