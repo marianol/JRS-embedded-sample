@@ -47,11 +47,9 @@ jQuery(document).ready(function ($) {
         $(".verticalWritingContainer").on("click", function(){
             if($("#repo_display").is(":visible")){
                 $("#repo_display").fadeOut("slow");
-                //$("#report_viewer").animate({"width": "90%"}, "slow");
                 $(this).toggleClass("open");
                 $(".verticalWriting").text("Show container");
             }else{
-                //$("#report_viewer").animate({"width": "40%"}, "slow");
                 $("#repo_display").fadeIn("slow");
                 $(this).toggleClass("open");
                 $(".verticalWriting").text("Hide container");
